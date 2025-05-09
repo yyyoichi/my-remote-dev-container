@@ -10,6 +10,14 @@ new WireGuardVpnStack(app, 'WireGuardVpnStack', {
   env: {region: process.env.CDK_DEFAULT_REGION, account: process.env.CDK_DEFAULT_ACCOUNT},
   cidr: CIDR,
 });
+
+const vpcId = process.env.VPC_ID;
+if (!vpcId) {
+  console.warn('VPC_ID is not set. Skipping DevelopmentInstanceCdkStack.');
+  process.exit(0);
+}
 new DevelopmentInstanceCdkStack(app, 'DevelopmentInstanceCdkStack', {
-  env: {region: process.env.CDK_DEFAULT_REGION, account: process.env.CDK_DEFAULT_ACCOUNT}
+  env: {region: process.env.CDK_DEFAULT_REGION, account: process.env.CDK_DEFAULT_ACCOUNT},
+  vpcId: vpcId,
+  cidr: CIDR,
 });

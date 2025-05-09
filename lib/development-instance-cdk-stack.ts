@@ -1,129 +1,57 @@
-import { CfnDisk } from 'aws-cdk-lib/aws-lightsail';
-import {
-  CfnOutput,
-  RemovalPolicy,
-  Stack,
-  StackProps,
-  aws_ec2 as ec2,
-  aws_iam as iam,
-} from 'aws-cdk-lib';
+import * as cdk from 'aws-cdk-lib';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import { Construct } from 'constructs';
-import { readFileSync } from 'node:fs';
 
-interface DevelopmentInstanceCdkStackProps extends StackProps {
+interface DevelopmentInstanceCdkStackProps extends cdk.StackProps {
+  vpcId: string;
+  cidr: string;
+  ec2InstanceProps?: Omit<ec2.InstanceProps, 'vpc' | 'vpcSubnets' | 'securityGroup' | 'keyPair'>;
 }
 
-export class DevelopmentInstanceCdkStack extends Stack {
+export class DevelopmentInstanceCdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: DevelopmentInstanceCdkStackProps) {
     super(scope, id, props);
 
-    const vpc = new ec2.Vpc(this, 'DevelpmentIncetanceVpc', {
-      maxAzs: 1,
-      natGateways: 0,
-      subnetConfiguration: [
-        {
-          cidrMask: 24,
-          name: 'public-subnet',
-          subnetType: ec2.SubnetType.PUBLIC,
-        },
-        {
-          cidrMask: 24,
-          name: 'private-subnet',
-          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS,
-        },
-      ],
+    const vpc = ec2.Vpc.fromLookup(this, 'DevVpc', {
+      vpcId: props.vpcId,
     });
 
-
-    // NATインスタンス用セキュリティグループ
-    const natSg = new ec2.SecurityGroup(this, 'NatInstanceSG', {
-      vpc,
-      description: 'Security group for NAT instance',
-      allowAllOutbound: true,
-    });
-
-    natSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(80));
-    natSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(443));
-
-    // NAT用のロール
-    const natRole = new iam.Role(this, 'NatInstanceRole', {
-      assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
-      managedPolicies: [
-        iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2ReadOnlyAccess'),
-      ],
-    });
-
-    // NAT用AMI
-    const natAmi = ec2.MachineImage.latestAmazonLinux2023();
-
-    // NATインスタンス
-    const natInstance = new ec2.Instance(this, 'NatInstance', {
-      vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.NANO),
-      machineImage: natAmi,
-      securityGroup: natSg,
-      role: natRole,
-      sourceDestCheck: false, // NATには無効化が必要
-      requireImdsv2: true,
-    });
-
-    // Debian EC2インスタンスのセキュリティグループ
-    const ec2Sg = new ec2.SecurityGroup(this, 'Ec2InstanceSG', {
+    const securityGroup = new ec2.SecurityGroup(this, 'DevInstanceSG', {
       vpc,
       allowAllOutbound: true,
     });
-    ec2Sg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(22), 'Allow SSH from anywhere');
+    securityGroup.addIngressRule(ec2.Peer.ipv4(props.cidr), ec2.Port.tcp(22), 'Allow SSH from VPC CIDR');
 
-    // Debian用AMI
-    const debianAmi = ec2.MachineImage.genericLinux({
-      [props.env?.region!]: 'ami-00a7d6f3b78d70c5a',
-    });
-
-    const keyPair = new ec2.KeyPair(this, 'DevelopInstanceKeyPair', {
+    const keyPair = new ec2.KeyPair(this, 'DevInstanceKeyPair', {
       type: ec2.KeyPairType.RSA,
       format: ec2.KeyPairFormat.PEM,
     });
-    keyPair.applyRemovalPolicy(RemovalPolicy.DESTROY);
-    new CfnOutput(this, 'GetSSHKeyCommand', {
-      value: `aws ssm get-parameter --name /ec2/keypair/${keyPair.keyPairId} --region ${this.region} --with-decryption --query Parameter.Value --output text`,
-    });
-    // Debian EC2インスタンス（Dockerインストール前提）
-    const instance = new ec2.Instance(this, 'DebianEc2ContainerHost', {
+    keyPair.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
+    const instance = new ec2.Instance(this, 'DevInstance', {
       vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-      instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.SMALL),
-      machineImage: debianAmi,
-      securityGroup: ec2Sg,
+      securityGroup: securityGroup,
       keyPair: keyPair,
+      requireImdsv2: true,
       blockDevices: [
         {
           deviceName: '/dev/xvda',
           volume: ec2.BlockDeviceVolume.ebs(20),
         },
       ],
-      requireImdsv2: true,
+      instanceType: ec2.InstanceType.of(ec2.InstanceClass.G4DN, ec2.InstanceSize.XLARGE),
+      machineImage: ec2.MachineImage.genericLinux({
+        // Deep Learning AMI GPU PyTorch 1.13.1 (Ubuntu 20.04) 20230518
+        [props.env?.region!]: 'ami-00e3e6712b8609e0d',
+      }),
     });
 
-    // ルートテーブルの更新（Private SubnetからNATへ）
-    vpc.privateSubnets.forEach((subnet, index) => {
-      // 新しいルートテーブルを作成
-      const routeTable = new ec2.CfnRouteTable(this, `PrivateRouteTable-${index}`, {
-        vpcId: vpc.vpcId,
-      });
-
-      // サブネットとルートテーブルを関連付け
-      new ec2.CfnSubnetRouteTableAssociation(this, `PrivateSubnetAssoc-${index}`, {
-        subnetId: subnet.subnetId,
-        routeTableId: routeTable.ref,
-      });
-
-      // ルートテーブルにNATインスタンスへのルートを追加
-      new ec2.CfnRoute(this, `PrivateRoute-${index}`, {
-        routeTableId: routeTable.ref,
-        destinationCidrBlock: '0.0.0.0/0',
-        instanceId: natInstance.instanceId,
-      });
+    new cdk.CfnOutput(this, 'DevInstanceId', {
+      value: instance.instanceId,
+      description: 'Instance ID of the Dev instance',
+    });
+    new cdk.CfnOutput(this, 'GetDevInstanceSSHKeyCommand', {
+      value: `aws ssm get-parameter --name /ec2/keypair/${keyPair.keyPairId} --region ${this.region} --with-decryption --query Parameter.Value --output text`,
     });
   }
 }
