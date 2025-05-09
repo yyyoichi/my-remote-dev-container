@@ -62,6 +62,7 @@ export class DevelopmentInstanceCdkStack extends Stack {
       securityGroup: natSg,
       role: natRole,
       sourceDestCheck: false, // NATには無効化が必要
+      requireImdsv2: true,
     });
 
     // Debian EC2インスタンスのセキュリティグループ
@@ -90,6 +91,7 @@ export class DevelopmentInstanceCdkStack extends Stack {
           volume: ec2.BlockDeviceVolume.ebs(20),
         },
       ],
+      requireImdsv2: true,
     });
 
     // ルートテーブルの更新（Private SubnetからNATへ）
