@@ -1,10 +1,14 @@
+import { CfnDisk } from 'aws-cdk-lib/aws-lightsail';
 import {
+  CfnOutput,
+  RemovalPolicy,
   Stack,
   StackProps,
   aws_ec2 as ec2,
   aws_iam as iam,
 } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
+import { readFileSync } from 'node:fs';
 
 interface DevelopmentInstanceCdkStackProps extends StackProps {
 }
@@ -13,7 +17,6 @@ export class DevelopmentInstanceCdkStack extends Stack {
   constructor(scope: Construct, id: string, props: DevelopmentInstanceCdkStackProps) {
     super(scope, id, props);
 
-    // 既存のVPCを参照
     const vpc = new ec2.Vpc(this, 'DevelpmentIncetanceVpc', {
       maxAzs: 1,
       natGateways: 0,
@@ -77,6 +80,14 @@ export class DevelopmentInstanceCdkStack extends Stack {
       [props.env?.region!]: 'ami-00a7d6f3b78d70c5a',
     });
 
+    const keyPair = new ec2.KeyPair(this, 'DevelopInstanceKeyPair', {
+      type: ec2.KeyPairType.RSA,
+      format: ec2.KeyPairFormat.PEM,
+    });
+    keyPair.applyRemovalPolicy(RemovalPolicy.DESTROY);
+    new CfnOutput(this, 'GetSSHKeyCommand', {
+      value: `aws ssm get-parameter --name /ec2/keypair/${keyPair.keyPairId} --region ${this.region} --with-decryption --query Parameter.Value --output text`,
+    });
     // Debian EC2インスタンス（Dockerインストール前提）
     const instance = new ec2.Instance(this, 'DebianEc2ContainerHost', {
       vpc,
@@ -84,7 +95,7 @@ export class DevelopmentInstanceCdkStack extends Stack {
       instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.SMALL),
       machineImage: debianAmi,
       securityGroup: ec2Sg,
-      keyPair: new ec2.KeyPair(this, 'DevelopmentKey'),
+      keyPair: keyPair,
       blockDevices: [
         {
           deviceName: '/dev/xvda',
