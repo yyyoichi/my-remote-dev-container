@@ -2,14 +2,14 @@ import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import { Construct } from 'constructs';
 
-interface DevelopmentInstanceCdkStackProps extends cdk.StackProps {
+interface DevInstanceCdkStackProps extends cdk.StackProps {
   vpcId: string;
   cidr: string;
   ec2InstanceProps?: Omit<ec2.InstanceProps, 'vpc' | 'vpcSubnets' | 'securityGroup' | 'keyPair'>;
 }
 
-export class DevelopmentInstanceCdkStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props: DevelopmentInstanceCdkStackProps) {
+export class DevInstanceCdkStack extends cdk.Stack {
+  constructor(scope: Construct, id: string, props: DevInstanceCdkStackProps) {
     super(scope, id, props);
 
     const vpc = ec2.Vpc.fromLookup(this, 'DevVpc', {
@@ -29,7 +29,7 @@ export class DevelopmentInstanceCdkStack extends cdk.Stack {
     keyPair.applyRemovalPolicy(cdk.RemovalPolicy.DESTROY);
     const instance = new ec2.Instance(this, 'DevInstance', {
       vpc,
-      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
+      vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
       securityGroup: securityGroup,
       keyPair: keyPair,
       requireImdsv2: true,

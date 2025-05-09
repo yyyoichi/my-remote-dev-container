@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import * as cdk from 'aws-cdk-lib';
-import { DevelopmentInstanceCdkStack } from '../lib/development-instance-cdk-stack';
+import { DevInstanceCdkStack } from '../lib/dev-instance-cdk-stack';
 import { WireGuardVpnStack } from '../lib/wire-guard-cdk-stack';
 
 const CIDR = process.env.CIDR || '10.11.11.0/16';
@@ -13,10 +13,10 @@ new WireGuardVpnStack(app, 'WireGuardVpnStack', {
 
 const vpcId = process.env.VPC_ID;
 if (!vpcId) {
-  console.warn('VPC_ID is not set. Skipping DevelopmentInstanceCdkStack.');
-  process.exit(0);
+  console.warn('VPC_ID is not set. Skipping DevInstanceCdkStack.');
+  process.exit(1);
 }
-new DevelopmentInstanceCdkStack(app, 'DevelopmentInstanceCdkStack', {
+new DevInstanceCdkStack(app, 'DevInstanceCdkStack', {
   env: {region: process.env.CDK_DEFAULT_REGION, account: process.env.CDK_DEFAULT_ACCOUNT},
   vpcId: vpcId,
   cidr: CIDR,
