@@ -9,11 +9,14 @@
 
 - クライアント接続したいPCにWireGuardアプリ
 - AWS CDK typescript
+- `cp .env.example .env`
+- `.env.CDK_DEFAULT_ACCOUNT`,`.env.CDK_DEFAULT_REGION`を設定する。
+- 必要があれば`.env.CIDR`,`.env.UDP_PORT`を設定する。
 
 ### 1. WireGuardインスタンスを作成
 
 - `npx cdk deploy WireGuardVpnStack`
-- 出力された`Outputs:`以下は置いておくと便利
+- 出力された`Outputs:`以下はどこかに置いておくと便利
 
 必要に応じて`cdk bootstrap`の実行や`--profile`の指定。
 
