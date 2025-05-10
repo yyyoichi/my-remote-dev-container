@@ -27,5 +27,10 @@ export class IamCdkStack extends cdk.Stack {
     const cliUser = new iam.User(this, 'DevelopmentInstanceAccessUser');
     cliUser.attachInlinePolicy(ec2AccessPolicy);
 
+    new cdk.CfnOutput(this, 'CliUserUserName', {
+      value: cliUser.userName,
+      description: 'CLI User Name',
+    });
+
   }
 }
