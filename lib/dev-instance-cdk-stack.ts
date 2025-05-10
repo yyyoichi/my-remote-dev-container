@@ -50,6 +50,10 @@ export class DevInstanceCdkStack extends cdk.Stack {
       value: instance.instanceId,
       description: 'Instance ID of the Dev instance',
     });
+    new cdk.CfnOutput(this, 'DevInstancePrivateIp', {
+      value: instance.instancePrivateIp,
+      description: 'Private IP of the Dev instance',
+    });
     new cdk.CfnOutput(this, 'GetDevInstanceSSHKeyCommand', {
       value: `aws ssm get-parameter --name /ec2/keypair/${keyPair.keyPairId} --region ${this.region} --with-decryption --query Parameter.Value --output text`,
     });

@@ -5,6 +5,7 @@ import { Construct } from 'constructs';
 interface DevelopmentInstanceCdkStackProps extends cdk.StackProps {
   // like 10.11.11.0/16
   cidr: string;
+  udpPort: number;
 }
 
 export class WireGuardVpnStack extends cdk.Stack {
@@ -31,13 +32,13 @@ export class WireGuardVpnStack extends cdk.Stack {
       allowAllOutbound: true,
     });
     securityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(22), 'Allow SSH');
-    securityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.udp(51820), 'Allow WireGuard');
+    securityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.udp(props.udpPort), 'Allow WireGuard');
     const noSshsecurityGroup = new ec2.SecurityGroup(this, 'NoSshWireGuardSG', {
       vpc,
       description: 'Allow WireGuard',
       allowAllOutbound: true,
     });
-    noSshsecurityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.udp(51820), 'Allow WireGuard');
+    noSshsecurityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.udp(props.udpPort), 'Allow WireGuard');
 
     const keyPair = new ec2.KeyPair(this, 'DevelopInstanceKeyPair', {
       type: ec2.KeyPairType.RSA,
@@ -77,6 +78,14 @@ export class WireGuardVpnStack extends cdk.Stack {
     });
     new cdk.CfnOutput(this, 'GetWireGuardSSHKeyCommand', {
       value: `aws ssm get-parameter --name /ec2/keypair/${keyPair.keyPairId} --region ${this.region} --with-decryption --query Parameter.Value --output text`,
+    });
+    new cdk.CfnOutput(this, 'WireGuardPublicIP', {
+      value: eip.attrPublicIp,
+      description: 'Public IP of the WireGuard instance',
+    });
+    new cdk.CfnOutput(this, 'WireGuardInstanceUDPPort', {
+      value: props.udpPort.toString(),
+      description: 'UDP port of the WireGuard instance',
     });
     new cdk.CfnOutput(this, 'AllowedIps', {
       value: `10.66.66.0/24,${vpc.vpcCidrBlock}`,
