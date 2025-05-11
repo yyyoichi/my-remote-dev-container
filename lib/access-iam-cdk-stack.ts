@@ -13,16 +13,23 @@ export class IamCdkStack extends cdk.Stack {
 
     const accountId = cdk.Stack.of(this).account;
     const region = cdk.Stack.of(this).region;
-
-    const ec2PolicyStatement = new iam.PolicyStatement({
-      actions: ['ec2:DescribeInstances', 'ec2:StartInstances', 'ec2:StopInstances'],
+    
+    const descriptionPolicyStatement = new iam.PolicyStatement({
+      actions: ['ec2:DescribeInstances'],
+      resources: [
+        `*`,
+      ],
+      effect: iam.Effect.ALLOW,
+    });
+    const switchPolicyStatement = new iam.PolicyStatement({
+      actions: ['ec2:StartInstances', 'ec2:StopInstances'],
       resources: [
         `arn:aws:ec2:${region}:${accountId}:instance/${props.wireGuardInstanceId}`,
         `arn:aws:ec2:${region}:${accountId}:instance/${props.devInstanceId}`,
       ],
     });
     const ec2AccessPolicy = new iam.Policy(this, 'DevelopmentInstanceAccessPolicy', {
-      statements: [ec2PolicyStatement],
+      statements: [descriptionPolicyStatement, switchPolicyStatement],
     });
     const cliUser = new iam.User(this, 'DevelopmentInstanceAccessUser');
     cliUser.attachInlinePolicy(ec2AccessPolicy);
