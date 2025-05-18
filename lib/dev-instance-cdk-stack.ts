@@ -33,12 +33,7 @@ export class DevInstanceCdkStack extends cdk.Stack {
       securityGroup: securityGroup,
       keyPair: keyPair,
       requireImdsv2: true,
-      blockDevices: [
-        {
-          deviceName: '/dev/xvda',
-          volume: ec2.BlockDeviceVolume.ebs(20),
-        },
-      ],
+      blockDevices: [],
       instanceType: ec2.InstanceType.of(ec2.InstanceClass.G4DN, ec2.InstanceSize.XLARGE),
       machineImage: ec2.MachineImage.genericLinux({
         // Deep Learning AMI GPU PyTorch 1.13.1 (Ubuntu 20.04) 20230518
